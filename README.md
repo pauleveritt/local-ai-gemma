@@ -2,9 +2,9 @@
 
 ## New sections
 - Simple version (Kostia) and bigger version (Isabel)
-- Skill for analyzing the telemetry
 - Gemma 12, 26, DeepSeek Flash
-- Options: LSP, RTK, caveman, speculative decoding, AFM, more subagents
+- Explain why SLMs need so much help
+- Options: LSP, RTK, Context7, caveman, speculative decoding, AFM, more subagents
 
 ## Model config
 
