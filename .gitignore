@@ -1,0 +1,6 @@
+.idea/
+reports
+requirements.txt
+__pycache__
+.venv
+uvicorn.log
