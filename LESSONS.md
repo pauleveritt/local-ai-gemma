@@ -69,6 +69,14 @@ and another chance for context drift. In a repeatable production system, a
 dedicated orchestrator and mechanical verifier are worthwhile because they move
 loop control outside the SLM.
 
+A 12B or 27B orchestrator should still be procedural rather than deliberative.
+It has enough headroom to read named files, construct a packet, run a fixed test
+command, compare the changed-file set, and check literal requirements. Do not
+ask it to invent architecture, perform an open-ended semantic review, or repair
+application code itself. Start a fresh orchestrator chat for each phase when
+phase-to-phase context isolation matters; a persistent orchestrator isolates
+its children but continues accumulating its own history.
+
 Independent verification is foundational. A live Gemma run wrote an edit with
 an unresolvable name and still shipped it. Even direct diagnostic feedback does
 not guarantee repair: observed self-correction engaged with only half of the
@@ -148,17 +156,32 @@ speculative plans, and unnecessary tool use: `temperature: 0.2`, `top_p: 0.9`,
 and `top_k: 64`. Reserve broader sampling for work that genuinely needs
 divergent ideas.
 
-## 11. Give the implementer one job and one validation path
+## 11. Give the implementer one job and put validation at one layer
 
-The implementer should generate code directly, read only named files, and run
-the project's explicit validation command. Disable planning/design skills for
-routine implementation and avoid opportunistic linters, type checkers, or shell
-activation when the contract calls for `.venv/bin/python -m pytest tests/`.
+In the minimum workflow, the implementer generates code, reads only named
+files, runs the project's explicit validation command once, and stops whether
+it passes or fails. This exposes a result without opening a child repair loop,
+but it is not independent verification.
+
+In the medium workflow, the implementer is write-only. The orchestrator runs
+`.venv/bin/python -m pytest tests/`, compares the changed files with the packet,
+and checks exact contract strings after the child returns. Do not make both
+roles own repair. Disable planning/design skills for routine implementation and
+avoid opportunistic linters, type checkers, or shell activation.
 
 If the child needs more information, the orchestrator should provide a narrower
 packet rather than asking the child to explore the entire repository. Use a hard
 step cap as a circuit breaker, not as a solution: it bounds a runaway run but
 does not fix a bad packet, stale edit anchor, or semantic trap.
+
+The recorded doom loops were not hypothetical. One child exhausted all 20
+steps in edit retries, another was cancelled after 100 messages, and another
+ran pytest ten times after it had already passed. In the last case the model's
+reasoning repeatedly decided to stop but emitted another tool call. OpenCode's
+built-in doom-loop guard did not catch repetition spread across separate
+assistant messages. A platform-enforced step cap bounded the cost but sometimes
+forced an empty final response, so the orchestrator must judge the files and
+validation evidence rather than depend on a perfect child summary.
 
 Time budgets are a second circuit breaker. Live runs showed that many prompts
 past the first could not converge within 120 seconds. Treat a timeout as
@@ -172,6 +195,13 @@ For a small file the child has completely read and whose final state belongs to
 the current phase, a whole-file write is more reliable than repeated
 anchor-based edits. Gemma repeatedly used stale or empty `oldString` values,
 producing edit retries that consumed turns without making the intended change.
+
+This was a broad failure mode, not one malformed `__main__` literal: the session
+record contained 27 `oldString` mismatches across blind edits, stale content,
+whitespace and escaping differences, empty anchors, and late-session collapse.
+A repair packet should provide the current file contents and required final
+state. When the packet grants complete ownership of a small file, ask a fresh
+child for a full-file write; do not ask it to apply an `oldString` patch.
 
 Whole-file writes are unsafe when another phase owns part of the file: they can
 erase routes, imports, or behavior that must survive. Use one only when the
@@ -189,6 +219,13 @@ exercise a script entrypoint or prove that a deprecation warning was removed.
 Put known semantic traps in the phase packet, and add focused behavior tests for
 paths that ordinary request tests do not cover.
 
+For medium, encode the few known, phase-relevant facts directly in the packet.
+Do not attach general framework documentation to every run. Context7 or another
+documentation retriever belongs in maximum: the orchestrator should consult it
+only for a real API uncertainty, then compress the answer into one concrete rule
+for the implementer. This preserves the benefit without paying the full context
+cost in both agent roles.
+
 ## 14. Interpret context and cache metrics correctly
 
 LM Studio and oMLX do not report prompt reuse the same way. oMLX exposes
@@ -199,6 +236,68 @@ Nonzero cache reads prove prefix reuse, not a wall-clock speedup. Parent
 lifetime can include idle time and nested child time, so report active message
 span, parent time, and implementer time separately instead of adding nested
 durations together.
+
+## Workflow levels
+
+### Minimum
+
+Minimum uses one fresh parent chat and one fresh `@implementer1` for a single
+roadmap phase. The parent turns the phase into a small packet containing allowed
+files, exact behavior, preservation requirements, and one validation command.
+The child implements, runs that command once, and reports; the parent reviews
+without repairing. Its deliberate limitation is that validation is
+self-reported rather than independent.
+
+### Medium
+
+Medium moves the stable protocol into a phase-local `orchestrator2` primary
+agent so the kickoff can be as small as `Run Phase N from @specs/roadmap.md`.
+The design must remain workable on Gemma 4 12B, though a 27B model provides more
+margin. The orchestrator:
+
+1. Reads the mission, stack, requested phase, and current target files.
+2. Records the existing changed-file baseline and constructs a compact packet.
+3. Starts a fresh, write-only `@implementer2` without a task ID.
+4. Runs pytest, compares changed files, and checks exact required and preserved
+   strings itself.
+5. On failure, may send one exact repair packet to one new child, validate once
+   more, and then stop.
+
+The repair child receives the failing command or contract check, exact output,
+current allowed file contents, and required final state. It never inherits the
+first child's tool history. This single repair is the best-case design to test,
+not an established guarantee: earlier validate-and-redelegate experiments were
+reverted after edit-anchor failures. If telemetry shows the orchestrator cannot
+reliably stop after one repair, medium should report the failure instead and
+leave automatic repair for maximum.
+
+OpenCode does not provide a per-agent "one repair task" counter. The one-repair
+rule still depends on the orchestrator remembering it; the 16-step agent cap is
+the only mechanical bound in medium. Measure this explicitly rather than
+describing the prompt rule as enforced loop control.
+
+Because this course uses small files and `oldString` failures were severe,
+`implementer2` is instructed to read each named existing file completely and
+write its complete final content, preserving all shared content named by the
+packet. Current OpenCode maps both `edit` and `write` to the same `edit`
+permission, so medium cannot mechanically expose `write` while denying
+exact-match edits. Treat compliance as an experiment to measure. Maximum should
+replace this prompt rule with a tool policy or deterministic structural
+transform, especially for larger or concurrently owned files.
+
+Do not force a scout agent to read one or two known files. Prior experiments
+ignored that rule across eight phases because direct reads were cheaper. A
+read-only scout is useful only for genuine cross-file searches or convention
+discovery.
+
+### Maximum boundary
+
+Maximum adds controls whose setup or context cost is too high for the teaching
+baseline: mechanically enforced tool-output limits, structural navigation or
+LSP checks, deterministic transforms, on-demand Context7 research, richer
+contract tests, telemetry-driven model verification, and externally enforced
+repair budgets. These belong outside the small implementer's prompt whenever a
+tool can own them more reliably.
 
 ## Evidence sources
 
