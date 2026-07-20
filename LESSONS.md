@@ -32,10 +32,11 @@ explanation for slowness that the trace disproves. Hunches about local AI are
 usually wrong until session records, tool outputs, and validation results agree.
 
 After every meaningful run, inspect parent and child telemetry, tool outputs,
-and the actual diff. Use the repository's
-[OpenCode telemetry skill](.codex/skills/opencode-telemetry/SKILL.md) to read
-the OpenCode database without changing it, follow nested sessions, identify
-context risks, and report evidence-based metrics.
+and the actual diff. Use the host-local repository skill in
+[Codex](.codex/skills/opencode-telemetry/SKILL.md) or
+[OpenCode](.opencode/skills/opencode-telemetry/SKILL.md). Both skills use the
+same read-only collector, follow nested sessions, identify context risks, and
+report evidence-based metrics.
 
 Live local runs also showed that generation throughput can fall sharply as a
 conversation grows: one model fell from about 60 tokens/second at turn zero to

@@ -61,9 +61,10 @@ parent and child timing, turns, context growth, KV-cache reads, tool calls, and 
 explains slowness especially well. A small model needs a lot of help eliminating unnecessary exploration, retries, and
 context pollution; telemetry shows where that help is needed.
 
-The repository includes the Codex skill
-`.codex/skills/opencode-telemetry`. It automates the mechanical collection and leaves interpretation to an
-evidence-based report. The skill works on macOS, Windows, and Linux. Its bundled Python collector:
+The repository includes matching skills at `.codex/skills/opencode-telemetry`
+and `.opencode/skills/opencode-telemetry`. Each automates the mechanical
+collection and leaves interpretation to an evidence-based report. The bundled
+Python collector works on macOS, Windows, and Linux:
 
 - Locates the OpenCode SQLite database using `OPENCODE_DATA_DIR`, XDG paths, macOS application-data paths, or Windows
   `LOCALAPPDATA`/`APPDATA` paths.
@@ -79,16 +80,23 @@ evidence-based report. The skill works on macOS, Windows, and Linux. Its bundled
 
 1. Run the phase prompt in OpenCode. Let the run finish, or record the session ID if it fails. The session ID is
    available from OpenCode's session list.
-2. In Codex or OpenCode, invoke the `opencode-telemetry` skill and provide the session ID. Ask it to collect the
-   telemetry, inspect the relevant files and validation output, and report metrics and quality.
+2. In Codex or OpenCode, invoke the `opencode-telemetry` skill and provide the
+   session ID. Ask it to collect the telemetry, inspect the relevant files and
+   validation output, and report metrics and quality.
 3. The collector can also be run directly:
 
    ```bash
    # macOS/Linux
+   # Codex
    python3 .codex/skills/opencode-telemetry/scripts/collect_telemetry.py --list
    python3 .codex/skills/opencode-telemetry/scripts/collect_telemetry.py --session ses_...
 
+   # OpenCode
+   python3 .opencode/skills/opencode-telemetry/scripts/collect_telemetry.py --list
+   python3 .opencode/skills/opencode-telemetry/scripts/collect_telemetry.py --session ses_...
+
    # Windows
+   # Use the matching .codex or .opencode path with `py -3`.
    py -3 .codex/skills/opencode-telemetry/scripts/collect_telemetry.py --list
    py -3 .codex/skills/opencode-telemetry/scripts/collect_telemetry.py --session ses_...
    ```
