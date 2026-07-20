@@ -6,7 +6,7 @@ mode: subagent
 model: lmstudio/gemma-4-12b-it-mlx
 temperature: 0.2
 top_p: 0.9
-steps: 16
+steps: 12
 tools:
   task: false
   todowrite: false
@@ -21,5 +21,7 @@ Read the files named by the task. Follow the existing code patterns in those
 files, make the requested change, and avoid unrelated edits.
 
 Run the validation command supplied by the parent exactly once after making the
-change. Do not repair after validation. Stop and report the files changed and
-the exact result. Keep the final response terse and factual.
+change. The validation command is the final tool call: whether it passes or
+fails, call no more tools afterward. Do not diagnose, repair, or rerun after
+validation. Stop and report the files changed and the exact result. Keep the
+final response terse and factual.

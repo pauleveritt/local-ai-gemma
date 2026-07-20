@@ -7,6 +7,12 @@ model: lmstudio/gemma-4-12b-it-mlx
 temperature: 0.2
 top_p: 0.9
 steps: 16
+permission:
+  edit: deny
+  bash:
+    "*": deny
+    "uv run --frozen pytest tests/": allow
+    "git status --short": allow
 tools:
   edit: false
   glob: false
@@ -45,7 +51,7 @@ the files changed. Validation is not the child's job.
 
 After the child returns, independently:
 
-1. Run `.venv/bin/python -m pytest tests/` once.
+1. Run `uv run --frozen pytest tests/` once.
 2. Run `git status --short` and compare it with the recorded baseline. Fail if
    the child changed a file outside the packet.
 3. Read the changed files and check the packet's exact required and preserved

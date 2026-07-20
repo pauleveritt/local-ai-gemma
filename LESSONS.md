@@ -56,6 +56,12 @@ unless the child actually needs them. Phase 2 is especially sensitive to packet
 size: broad context and growing test files repeatedly turned ordinary
 implementation into long repair loops.
 
+The environment is part of the phase contract. A declared FastAPI version and
+an installed Starlette version can imply different APIs. Pin the intended
+Python and package versions in `pyproject.toml` and `uv.lock`, run every tier
+with the same lock, and treat a spec/environment mismatch as an experiment
+failure rather than a model failure.
+
 ## 4. Separate orchestration, implementation, and verification
 
 Give each role a small, inspectable responsibility. The orchestrator prepares
@@ -159,13 +165,15 @@ divergent ideas.
 
 ## 11. Give the implementer one job and put validation at one layer
 
-In the minimum workflow, the implementer generates code, reads only named
-files, runs the project's explicit validation command once, and stops whether
-it passes or fails. This exposes a result without opening a child repair loop,
-but it is not independent verification.
+In the minimum workflow, a fresh `implementer1` receives one phase and its
+named specification files. It makes the edits, runs the project's explicit
+validation command once, and stops whether it passes or fails. It does not
+diagnose or repair after validation, so a failed minimum run remains a failed
+run. This exposes a result without opening a child repair loop, but it is not
+independent verification.
 
 In the medium workflow, the implementer is write-only. The orchestrator runs
-`.venv/bin/python -m pytest tests/`, compares the changed files with the packet,
+`uv run --frozen pytest tests/`, compares the changed files with the packet,
 and checks exact contract strings after the child returns. Do not make both
 roles own repair. Disable planning/design skills for routine implementation and
 avoid opportunistic linters, type checkers, or shell activation.
@@ -227,6 +235,13 @@ only for a real API uncertainty, then compress the answer into one concrete rule
 for the implementer. This preserves the benefit without paying the full context
 cost in both agent roles.
 
+Do not silently repair a minimum run. In one recorded run, the child received
+the instruction to repair until tests passed even though its agent contract said
+to stop after one validation. It then spent seven turns repeating no-op edits;
+the parent later edited the code and claimed success. The fix is a terminal
+validation instruction in the implementer prompt, not more persuasive wording
+or a repair loop after the failure.
+
 ## 14. Interpret context and cache metrics correctly
 
 LM Studio and oMLX do not report prompt reuse the same way. oMLX exposes
@@ -242,11 +257,10 @@ durations together.
 
 ### Minimum
 
-Minimum uses one fresh parent chat and one fresh `@implementer1` for a single
-roadmap phase. The parent turns the phase into a small packet containing allowed
-files, exact behavior, preservation requirements, and one validation command.
-The child implements, runs that command once, and reports; the parent reviews
-without repairing. Its deliberate limitation is that validation is
+Minimum uses one fresh `@implementer1` chat for a single roadmap phase. The
+implementer reads the named specifications, makes the requested edits, runs
+the validation command exactly once as its final tool call, and reports; it
+does not repair afterward. Its deliberate limitation is that validation is
 self-reported rather than independent.
 
 ### Medium

@@ -2,6 +2,19 @@
 
 The idea of this project is to show how to steer Local AI agent/model towards better/faster outcomes.
 
+## Setup
+
+Use the locked course-consistent environment for every workflow:
+
+```bash
+uv sync --frozen
+uv run --frozen pytest tests/
+```
+
+Do not change dependencies between minimum, medium, and maximum. The
+specification and `uv.lock` are part of the experiment; changing versions after
+a run makes the comparison invalid.
+
 ## New sections
 
 - Simple version (Kostia) and bigger version (Isabel)
@@ -110,32 +123,33 @@ assertion that everything passed.
 
 ### Minimum prompt
 
-Use the project `@implementer1` subagent. Start a new chat for each phase and replace `N` with its number.
+Use your normal primary agent. Start a new chat for each phase and replace `N`
+with its number. The prompt below tells the primary agent to use a fresh
+`@implementer1` subagent; no UI agent selection is required.
 
 The benefits:
 
-1. *Complete, narrow handoff packet*. The child receives only allowed files, exact strings/behavior, and one validation
-   command. This removes the most costly decisions: what to inspect, what to change, and how to judge success.
+1. *Phase-local scope*. `@implementer1` receives one phase, the project specifications, and one validation command rather
+   than an open-ended request.
 
 2. *Fresh, single-purpose implementer*. A new @implementer1 has one job: implement one scoped phase. It avoids the
    parent’s accumulated context and prevents planning, design, and broad exploration from consuming the small model’s
    budget.
 
-3. *One validation path and a stop boundary*. The child runs one specified command and reports its exact result. The
-   parent reviews but does not repair. This baseline exposes failures without starting a repair loop; it is not yet
+3. *One validation path and a stop boundary*. The agent runs one specified command and reports its exact result. It does
+   not diagnose or repair after validation, so this baseline exposes failures without starting a repair loop; it is not
    independent verification.
-
-Here's the prompt to enter which triggers `implementer1`:
 
 ```markdown
 Read @specs/mission.md, @specs/tech-stack.md, and @specs/roadmap.md. Run only Phase N from the roadmap. Keep this chat
 phase-local.
 
-Parent: make a short task list, then delegate the whole phase once to a fresh @implementer1. Give it only the files it
-may change, required strings and behavior, and validation command `.venv/bin/python -m pytest tests/`.
+Delegate this phase exactly once to a fresh `@implementer1` subagent. Give it only the named specification files and the
+phase task. Do not implement, edit, or write phase files yourself, and do not use another agent.
 
-Tell the child to implement, validate, and report the exact result tersely. Do not fix code afterward; review and report
-only critical mistakes. If @implementer1 fails to start, report the error and stop—do not use another agent.
+Tell `@implementer1` to make the requested edits, run `uv run --frozen pytest tests/` exactly once as its final tool call,
+and report the changed files and exact pass/fail result tersely. Whether it passes or fails, it must call no more tools
+and must not diagnose or repair. After it returns, review and report only; do not edit, repair, or rerun validation.
 ```
 
 ### Medium prompt
