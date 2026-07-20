@@ -51,5 +51,5 @@
   - Create a new `Complaint` and append to the `complaints` list
   - Redirect to `GET /complaints` (use `RedirectResponse` with status 303)
 - Write tests in `tests/test_app.py`:
-  - `POST /complaints` with `agent_name` and `text` redirects to `/complaints`
+  - `POST /complaints` with `agent_name` and `text`, using `follow_redirects=False`, returns 303 with `Location: /complaints`
   - After `POST /complaints`, `GET /complaints` response includes the newly added complaint

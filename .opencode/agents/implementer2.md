@@ -4,15 +4,11 @@ description: >-
   and preservation rules. Validation belongs to the orchestrator.
 mode: subagent
 model: lmstudio/gemma-4-12b-it-mlx
-temperature: 0.2
-top_p: 0.9
 steps: 10
 tools:
   bash: false
   glob: false
   grep: false
-  task: false
-  todowrite: false
   webfetch: false
   skill: false
 ---

@@ -169,11 +169,18 @@ In the minimum workflow, a fresh `implementer1` receives one phase and its
 named specification files. It makes the edits, runs the project's explicit
 validation command once, and stops whether it passes or fails. It does not
 diagnose or repair after validation, so a failed minimum run remains a failed
-run. This exposes a result without opening a child repair loop, but it is not
-independent verification.
+run. The Bash permission allows only `uv run --frozen python -m pytest tests/`;
+this prevents a failed run from becoming a `PYTHONPATH` workaround and second
+test run. This exposes a result without opening a child repair loop, but it is
+not independent verification.
+
+For a phase that changes shared files, the parent packet must mark each target
+as new or shared and state the routes, tests, strings, and behavior that must
+survive. The implementer reads every existing target completely before editing;
+otherwise a phase can pass its new smoke test while erasing earlier behavior.
 
 In the medium workflow, the implementer is write-only. The orchestrator runs
-`uv run --frozen pytest tests/`, compares the changed files with the packet,
+`uv run --frozen python -m pytest tests/`, compares the changed files with the packet,
 and checks exact contract strings after the child returns. Do not make both
 roles own repair. Disable planning/design skills for routine implementation and
 avoid opportunistic linters, type checkers, or shell activation.
@@ -259,9 +266,10 @@ durations together.
 
 Minimum uses one fresh `@implementer1` chat for a single roadmap phase. The
 implementer reads the named specifications, makes the requested edits, runs
-the validation command exactly once as its final tool call, and reports; it
-does not repair afterward. Its deliberate limitation is that validation is
-self-reported rather than independent.
+the validation command exactly once as its final tool call, and reports the
+exact command and result; it does not repair afterward. The parent then reads
+the changed files and reports only critical contract violations. Its deliberate
+limitation is that validation is self-reported rather than independent.
 
 ### Medium
 

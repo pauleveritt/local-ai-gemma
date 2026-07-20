@@ -2,13 +2,16 @@
 
 The idea of this project is to show how to steer Local AI agent/model towards better/faster outcomes.
 
+Kostia TODO
+- Remove `uv` from prompt1
+
 ## Setup
 
 Use the locked course-consistent environment for every workflow:
 
 ```bash
 uv sync --frozen
-uv run --frozen pytest tests/
+uv run --frozen python -m pytest tests/
 ```
 
 Do not change dependencies between minimum, medium, and maximum. The
@@ -20,6 +23,7 @@ a run makes the comparison invalid.
 - Simple version (Kostia) and bigger version (Isabel)
 - Gemma 12, 26, DeepSeek Flash
 - Explain why SLMs need so much help
+- Qwen as big brain
 - Options for maxiumum
   - LSP, RTK, Context7, caveman, speculative decoding, AFM
   - More subagents: validator, researcher (Context7), planner (roadmap)
@@ -68,56 +72,14 @@ The LM Studio baseline came from the Gemma 4 12B IT MLX model metadata and the g
 
 ## Telemetry workflow
 
-Nothing matters except evidence. Our hunches about why an agent was slow or why a small model stumbled are usually wrong
-until the session telemetry proves them. OpenCode records the useful evidence: which model and agent actually ran,
-parent and child timing, turns, context growth, KV-cache reads, tool calls, and large tool outputs. That evidence
-explains slowness especially well. A small model needs a lot of help eliminating unnecessary exploration, retries, and
-context pollution; telemetry shows where that help is needed.
+After an OpenCode run, ask Codex or OpenCode:
 
-The repository includes matching skills at `.codex/skills/opencode-telemetry`
-and `.opencode/skills/opencode-telemetry`. Each automates the mechanical
-collection and leaves interpretation to an evidence-based report. The bundled
-Python collector works on macOS, Windows, and Linux:
+> Use your `opencode-telemetry` skill to evaluate the last prompt.
 
-- Locates the OpenCode SQLite database using `OPENCODE_DATA_DIR`, XDG paths, macOS application-data paths, or Windows
-  `LOCALAPPDATA`/`APPDATA` paths.
-- Follows a parent session's child sessions and reports model, agent, lifetime, active message span, turns, tool calls,
-  input/output tokens, and context.
-- Separates fresh input from `cache_read` tokens, so LM Studio and oMLX metrics are not incorrectly compared as if they
-  used the same accounting.
-- Flags recursive listings, protected-directory traversal, and unusually large tool output that can explain context
-  growth and slowness.
-- Reads the database read-only. It does not start OpenCode or change project files.
-
-### Run and analyze
-
-1. Run the phase prompt in OpenCode. Let the run finish, or record the session ID if it fails. The session ID is
-   available from OpenCode's session list.
-2. In Codex or OpenCode, invoke the `opencode-telemetry` skill and provide the
-   session ID. Ask it to collect the telemetry, inspect the relevant files and
-   validation output, and report metrics and quality.
-3. The collector can also be run directly:
-
-   ```bash
-   # macOS/Linux
-   # Codex
-   python3 .codex/skills/opencode-telemetry/scripts/collect_telemetry.py --list
-   python3 .codex/skills/opencode-telemetry/scripts/collect_telemetry.py --session ses_...
-
-   # OpenCode
-   python3 .opencode/skills/opencode-telemetry/scripts/collect_telemetry.py --list
-   python3 .opencode/skills/opencode-telemetry/scripts/collect_telemetry.py --session ses_...
-
-   # Windows
-   # Use the matching .codex or .opencode path with `py -3`.
-   py -3 .codex/skills/opencode-telemetry/scripts/collect_telemetry.py --list
-   py -3 .codex/skills/opencode-telemetry/scripts/collect_telemetry.py --session ses_...
-   ```
-
-The report must distinguish parent lifetime from active work, because a reused chat can contain idle gaps. It must also
-distinguish main-agent time from nested implementer time, and treat nonzero KV-cache reads as evidence of reuse, not
-proof of a speedup. Quality claims require the actual test result and a source/spec inspection, not the agent's final
-assertion that everything passed.
+The skill finds the relevant session and produces an evidence-based report on
+the run: timing, agent and model activity, context and cache use, tool calls,
+and validation or quality signals. Use its report to understand slowdowns or
+unexpected outcomes; you do not need to run the telemetry collector yourself.
 
 ## Prompts
 
@@ -136,20 +98,28 @@ The benefits:
    parent’s accumulated context and prevents planning, design, and broad exploration from consuming the small model’s
    budget.
 
-3. *One validation path and a stop boundary*. The agent runs one specified command and reports its exact result. It does
-   not diagnose or repair after validation, so this baseline exposes failures without starting a repair loop; it is not
-   independent verification.
+3. *One validation path and hard discovery boundaries*. The only permitted Bash command is the specified validation
+   command, preventing recursive listings, environment activation, and other dives into `.venv`. `glob` is also disabled,
+   so an incomplete packet fails visibly instead of triggering broad repository discovery. The agent reports the exact
+   result and does not diagnose or repair after validation. This baseline exposes failures without starting a repair loop;
+   it is not independent verification.
 
 ```markdown
 Read @specs/mission.md, @specs/tech-stack.md, and @specs/roadmap.md. Run only Phase N from the roadmap. Keep this chat
 phase-local.
 
-Delegate this phase exactly once to a fresh `@implementer1` subagent. Give it only the named specification files and the
-phase task. Do not implement, edit, or write phase files yourself, and do not use another agent.
+Read the phase's target files, then delegate this phase exactly once to a fresh `@implementer1` subagent with a compact
+packet of repo-relative paths, not file contents: allowed files (new/shared), required changes, and exact behavior/tests
+to preserve. Give one acceptance path, not alternatives. Do not implement, edit, or write phase files yourself, and do
+not use another agent.
 
-Tell `@implementer1` to make the requested edits, run `uv run --frozen pytest tests/` exactly once as its final tool call,
-and report the changed files and exact pass/fail result tersely. Whether it passes or fails, it must call no more tools
-and must not diagnose or repair. After it returns, review and report only; do not edit, repair, or rerun validation.
+Tell `@implementer1` to make the requested edits, run `uv run --frozen python -m pytest tests/` exactly once as its final
+tool call without a prefix or shell chaining, and report the changed files, exact command, and exact pass/fail result
+tersely. Whether it passes or fails, it must call no more tools and must not diagnose or repair.
+
+After it returns, use only `read` on the reported changed files. Do not use Bash, glob, task, edit, or write. Report the
+exact validation result, files changed, and only critical contract violations: missing required strings, routes, imports,
+or unexpected files. Do not repair or rerun validation.
 ```
 
 ### Medium prompt
@@ -175,106 +145,3 @@ Run Phase N from @specs/roadmap.md.
 
 The one-repair rule is still model-enforced; the 16-step cap is the mechanical
 circuit breaker. Telemetry must show whether Gemma follows that boundary.
-
-### Lesson 3 in Claude Code
-
-```
-Look in @specs/mission.md and @specs/tech-stack.md for project details.
-Look at the @specs/roadmap.md and:
-- Implement each task one at a time from Phase 1 and Phase 2.
-
-Do not fix anything after the subagent. Do a review and provide a list of critical mistakes.
-```
-
-### Lesson 4 in Claude Code
-
-```
-Look in @specs/mission.md and @specs/tech-stack.md for project details.
-Look at the @specs/roadmap.md and:
-- Implement Phase 1 using a **new spawned** @general subagent.
-- Implement Phase 2 using a **new spawned** @general subagent.
-
-Do not fix anything after the subagent. Do a review and provide a list of critical mistakes.
-```
-
-### Lesson 5 in Claude Code
-
-```
-Look in @specs/mission.md and @specs/tech-stack.md for project details.
-Look at the @specs/roadmap.md and:
-- Implement Phase 1 using a **new spawned** Haiku subagent.
-- Implement Phase 2 using a **new spawned** Haiku subagent.
-
-Do not fix anything after the subagent. Do a review and provide a list of critical mistakes.
-```
-
-### Lesson 7 in OpenCode
-
-```
-Look in @specs/mission.md and @specs/tech-stack.md for project details.
-Look at the @specs/roadmap.md and:
-- Implement Phase 1
-- Implement Phase 2
-
-Do not fix anything after the subagent. Do a review and provide a list of critical mistakes.
-```
-
-### Lesson 8 in OpenCode
-
-```
-Look in @specs/mission.md and @specs/tech-stack.md for project details.
-Look at the @specs/roadmap.md and:
-- Implement Phase 1 using a *new spawned* general subagent.
-- Implement Phase 2 using a *new spawned* general subagent.
-
-
-Do not fix anything after the subagent. Do a review and provide a list of critical mistakes.
-```
-
-### Lesson 9 in OpenCode
-
-```
-Look in @specs/mission.md and @specs/tech-stack.md for project details.
-Look at the @specs/roadmap.md and:
-- Generate Phase 1 spec for the implementer subagent with task list
-- Spawn one new implementer subagent at a time and delegate implementation of each task in Phase 1 spec list. New implementer subagent to each task.
-
-Then do the same steps for the Phase 2.
-
-- Do not write the full code file for/instead of subagents, only suggest snippets.
-- Do not make fixes after subagents.
-- Do a review and provide a list of critical mistakes.
-```
-
-#### Setup OpenCode Agent
-
-This step should be run before running the prompt. It configures the project to have an OpenCode subagent named
-`implementer`.
-
-```
-Create an "Implementer" subagent:
-- This subagent should use the `lmstudio/gemma-4-12b-it-mlx` model
-- The main goal of this agent is to generate code and implement tasks delegated to it
-```
-
-### Lesson 11 in OpenCode
-
-Run one phase per new chat. Replace `N` with `1`, `2`, or `3`.
-
-```markdown
-Look in @specs/mission.md, @specs/tech-stack.md, and @specs/roadmap.md. Run only Phase N from the roadmap. Keep this
-chat phase-local.
-
-Parent: read the phase, then use the task tool once with a fresh spawned @implementer subagent. Send the child a tiny
-packet: repo-relative files only, exact user-visible strings, and validation command
-`.venv/bin/python -m pytest tests/`. Tell the child to implement directly, make file changes before its final response,
-and keep that final response terse and factual.
-
-For tiny generated files, tell the child to read once and then write the complete final file. For 303 redirect tests,
-tell the child that TestClient follows redirects by default and to use `follow_redirects=False`.
-
-After the child returns, do not fix code. Review and list only critical mistakes. If the @implementer task fails to
-start, report the exact error and stop. Do not retry with @general or any other subagent.
-```
-
-### Lesson 12 in OpenCode

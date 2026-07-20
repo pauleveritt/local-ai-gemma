@@ -5,8 +5,6 @@ description: >-
   implementation work that doesn't require deep reasoning.
 mode: subagent
 model: omlx/gemma-4-12b-coder-fable5-composer2.5-4bit
-temperature: 0.2
-top_p: 0.9
 steps: 20
 tools:
   skill: false
