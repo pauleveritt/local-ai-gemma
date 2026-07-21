@@ -90,7 +90,7 @@ with its number. The prompt below tells the primary agent to use a fresh
 
 The benefits:
 
-1. *Phase-local scope*. `@implementer1` receives one phase, the project specifications, and one validation command
+1. *Phase-local scope*. `@implementer1` receives one phase's requirements, named files, and one validation command
    rather than an open-ended request.
 
 2. *Fresh, single-purpose implementer*. A new @implementer1 has one job: implement one scoped phase. It avoids the
@@ -118,12 +118,12 @@ We'll tackle this in the next lesson.
 ```markdown
 Read @specs/mission.md, @specs/tech-stack.md, and @specs/roadmap.md. Run only Phase N.
 
-Read the phase's target files, then delegate this phase exactly once to a fresh `@implementer1` subagent with a compact
-packet of repo-relative paths, not file contents. Do not refer the child to specification files: the packet is complete.
-Classify each path once as new, shared-writable, or read-only. Tell the child to write the complete final content of
-every writable file and never use `edit`. Include only final requirements—no alternatives, corrections, or
-deliberation—plus required changes and exact behavior/tests to preserve. Give one acceptance path. Do not modify phase
-files or use another agent.
+Read the phase's target files, then delegate this phase exactly once to a fresh `@implementer1` subagent with a compact,
+self-contained packet: repo-relative writable paths, complete required final state, and exact behavior/tests to
+preserve. Do not refer the child to specification files or include file contents.
+
+Include this exact instruction: "For every writable file, use `write` with its complete final content; never use
+`edit`." Do not modify phase files or use another agent.
 
 Tell the child this is its final tool call and it must stop whether it passes or fails:
 `uv run --frozen python -m pytest tests/`.
