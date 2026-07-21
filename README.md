@@ -112,14 +112,21 @@ setup.
 
 c. We need to do each phase in a new parent chat. We'll tackle that with an orchestrator in Lesson 12.
 
+d. Explain that all of this extra text is from potholes. You might also hit some. When you do, look at the telemetry.
+We'll tackle this in the next lesson.
+
 ```markdown
 Read @specs/mission.md, @specs/tech-stack.md, and @specs/roadmap.md. Run only Phase N.
 
 Read the phase's target files, then delegate this phase exactly once to a fresh `@implementer1` subagent with a compact
-packet of repo-relative paths, not file contents: allowed files (new/shared), required changes, and exact behavior/tests
-to preserve. Give one acceptance path, not alternatives. Do not modify phase files or use another agent.
+packet of repo-relative paths, not file contents. Do not refer the child to specification files: the packet is complete.
+Classify each path once as new, shared-writable, or read-only. Tell the child to write the complete final content of
+every writable file and never use `edit`. Include only final requirements—no alternatives, corrections, or
+deliberation—plus required changes and exact behavior/tests to preserve. Give one acceptance path. Do not modify phase
+files or use another agent.
 
-Supply this validation command verbatim, with no other commands: `uv run --frozen python -m pytest tests/`.
+Tell the child this is its final tool call and it must stop whether it passes or fails:
+`uv run --frozen python -m pytest tests/`.
 
 After it returns, use only `read` on the reported changed files. Do not use Bash, glob, task, edit, or write. Report the
 exact validation result, files changed, and only critical contract violations: missing required strings, routes,

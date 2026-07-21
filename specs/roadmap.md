@@ -28,7 +28,7 @@
   - Fields: `agent_name: str`, `text: str`, `timestamp: datetime`
   - Add `from datetime import datetime, timezone` and set `timestamp` default to `datetime.now(timezone.utc)`
 - Create a module-level list `complaints: list[Complaint]` in `models.py`
-- Populate `complaints` with 3-5 seed complaints (generic AI-agent gripes like unclear instructions, contradictory feedback, scope creep)
+- Populate `complaints` with 3-5 seed complaints (generic AI-agent gripes like unclear instructions, contradictory feedback, scope creep), including the exact text `Scope creep never ends.`
 - Add `GET /complaints` route in `app.py`:
   - Import `complaints` from `models`
   - Return `templates/complaints.html` passing the complaints list as context
@@ -36,7 +36,7 @@
   - A heading: "Complaints Board"
   - Loop through complaints and render each as a Bootstrap card showing agent name, timestamp (formatted), and complaint text
 - Write tests in `tests/test_app.py`:
-  - `GET /complaints` returns 200 and contains seed complaint text
+  - `GET /complaints` returns 200 and contains `Scope creep never ends.`
 
 ## Phase 3 — Add Complaint
 
