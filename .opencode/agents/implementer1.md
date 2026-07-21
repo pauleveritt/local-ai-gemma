@@ -8,7 +8,7 @@ steps: 12
 permission:
   bash:
     "*": deny
-    "uv run --frozen python -m pytest tests/": allow
+    ".venv/bin/python -m pytest tests/": allow
 tools:
   glob: false
   webfetch: false

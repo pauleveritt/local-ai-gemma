@@ -121,12 +121,14 @@ Read @specs/mission.md, @specs/tech-stack.md, and @specs/roadmap.md. Run only Ph
 Read the phase's target files, then delegate this phase exactly once to a fresh `@implementer1` subagent with a compact,
 self-contained packet: repo-relative writable paths, complete required final state, and exact behavior/tests to
 preserve. Do not refer the child to specification files or include file contents.
+Do not author, draft, quote, or dictate implementation code—including tests or templates—in the delegation packet;
+provide requirements and acceptance criteria only, and leave all file contents for `@implementer1` to design and write.
 
 Include this exact instruction: "For every writable file, use `write` with its complete final content; never use
 `edit`." Do not modify phase files or use another agent.
 
 Tell the child this is its final tool call and it must stop whether it passes or fails:
-`uv run --frozen python -m pytest tests/`.
+`.venv/bin/python -m pytest tests/`.
 
 After it returns, use only `read` on the reported changed files. Do not use Bash, glob, task, edit, or write. Report the
 exact validation result, files changed, and only critical contract violations: missing required strings, routes,
