@@ -165,14 +165,16 @@ divergent ideas.
 
 ## 11. Give the implementer one job and put validation at one layer
 
-In the minimum workflow, a fresh `implementer1` receives one phase and its
-named specification files. It makes the edits, runs the project's explicit
-validation command once, and stops whether it passes or fails. It does not
-diagnose or repair after validation, so a failed minimum run remains a failed
-run. The Bash permission allows only `uv run --frozen python -m pytest tests/`;
-this prevents a failed run from becoming a `PYTHONPATH` workaround and second
-test run. This exposes a result without opening a child repair loop, but it is
-not independent verification.
+In the minimum workflow, a fresh `implementer1` receives one phase as a
+self-contained packet, not a pointer to the specifications. It makes the
+edits, runs the project's explicit validation command once, and stops whether
+it passes or fails. It does not diagnose or repair after validation, so a
+failed minimum run remains a failed run. The Bash permission must allow the
+same command named in the packet—for this project,
+`.venv/bin/python -m pytest tests/`—and deny every other command. This prevents
+a failed run from becoming a `PYTHONPATH` workaround and second test run. This
+exposes a result without opening a child repair loop, but it is not independent
+verification.
 
 For a phase that changes shared files, the parent packet must mark each target
 as new or shared and state the routes, tests, strings, and behavior that must
@@ -180,8 +182,8 @@ survive. The implementer reads every existing target completely before editing;
 otherwise a phase can pass its new smoke test while erasing earlier behavior.
 
 In the medium workflow, the implementer is write-only. The orchestrator runs
-`uv run --frozen python -m pytest tests/`, compares the changed files with the packet,
-and checks exact contract strings after the child returns. Do not make both
+the project's declared validation command, compares the changed files with the
+packet, and checks exact contract strings after the child returns. Do not make both
 roles own repair. Disable planning/design skills for routine implementation and
 avoid opportunistic linters, type checkers, or shell activation.
 
@@ -253,12 +255,76 @@ or a repair loop after the failure.
 
 LM Studio and oMLX do not report prompt reuse the same way. oMLX exposes
 `cache_read` tokens, so compare effective per-request context as
-`fresh input + cache read`, while reporting the two values separately.
+`fresh input + cache read`, while reporting the two values separately. Do not
+compare fresh-input totals, cache totals, or token ratios across providers as if
+they were one accounting system.
 
 Nonzero cache reads prove prefix reuse, not a wall-clock speedup. Parent
-lifetime can include idle time and nested child time, so report active message
-span, parent time, and implementer time separately instead of adding nested
-durations together.
+lifetime can include idle time and nested child time, so report parent and
+implementer time separately instead of adding nested durations together. The
+collector's activity span is useful but is based on message creation times and
+can omit final-response generation. For a precise end-to-end comparison, use
+the first user message's `time.created` and the final assistant message's
+`time.completed`; for parent inference, sum each assistant request from its
+start to its first tool start, or to completion when it has no tool.
+
+## 15. Compact packets must preserve the contract, not merely omit code
+
+"Do not write the code for the child" fixed one failure mode: parents had been
+copying complete files into delegation packets, leaving the implementer only
+to transcribe. The replacement is not a vague packet. A good packet names each
+repo-relative writable file, marks it as new or shared, states the exact
+required behavior and literals, and lists every route, import, test, string,
+and user-visible behavior that must survive.
+
+The parent must read every existing target before delegation. A glob that finds
+`app.py` and `tests/test_app.py` is not a read. In a later Phase 2 run, the
+parent skipped those reads and the child happened to rescue the workflow by
+reading them itself. That is not a valid self-contained handoff and can erase
+earlier behavior when the child is weaker or more literal.
+
+The Phase 1 comparison showed the opposite failure: an overly short packet
+produced code that passed its smoke test while omitting the Jinja title block,
+italic tagline, and required `starlette.testclient` import. Exact acceptance
+criteria are not implementation code; they belong in the packet and in tests.
+Do not include complete files, code blocks, pseudocode, or line-by-line
+solutions, but do include exact strings, APIs, preserved behavior, and
+phase-specific semantic constraints.
+
+## 16. Make validation terminal in the tool policy, then report raw evidence
+
+Terminal-validation wording alone is insufficient. Two Phase 3 children ran
+pytest, repaired a failure, and ran pytest again despite being told to stop
+after the first result. A final green test does not make that a compliant
+minimum run: it hides the original failure and turns validation into an
+unauthorized repair loop.
+
+Align the prompt, agent frontmatter, and validation command exactly. A Phase 1
+child initially could not run `.venv/bin/python -m pytest tests/` because its
+allowlist still admitted only the old `uv` command; it retried the denied call
+and the parent improperly ran pytest afterward. Once the allowlist matched the
+packet, later Phase 2 runs performed one permitted direct-venv test call.
+
+The parent must report the literal command result, including warnings and the
+first failure when one occurred. "Validation successful" or "no critical
+violations" is not evidence. Read the child tool output, the changed files,
+and the changed-file set; never infer a clean run from the child summary.
+
+## 17. Compare parent models with raw timing, not session lifetime
+
+In controlled Phase 1 comparisons, an oMLX Gemma parent used fewer turns and
+tools than a DeepSeek parent, and its child finished faster. The end-to-end
+runs were nevertheless nearly equal because the oMLX parent's own observed
+generation time was about eleven seconds longer. In a Phase 2 comparison, that
+same parent was slower both before delegation and in total despite a smaller
+reported effective context.
+
+These are measurements, not general model rankings. Backends tokenize and
+account for cache differently, and a parent session's lifetime can include
+idle time. The durable lesson is to report the resolved model, exact nested
+timeline, raw request timing, turns, tools, fresh input, and cache reads; then
+state only what that run supports. Fewer turns, a cache hit, or a smaller
+context number does not by itself prove lower latency or better orchestration.
 
 ## Workflow levels
 
