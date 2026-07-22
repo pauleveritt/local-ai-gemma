@@ -364,6 +364,14 @@ timeline, raw request timing, turns, tools, fresh input, and cache reads; then
 state only what that run supports. Fewer turns, a cache hit, or a smaller
 context number does not by itself prove lower latency or better orchestration.
 
+The latest Phase 3 comparison demonstrates the distinction. The constrained
+write-only implementer finished its active work in 44.5 seconds versus 60.7
+seconds in the earlier successful run, with 8 rather than 10 turns and about
+half the fresh input. Yet end-to-end lifetime was effectively unchanged (113.0
+seconds versus 113.5), because the controller now performs the baseline,
+independent pytest run, changed-file diff, and post-change reads. Report that
+as a reliability improvement, not a throughput claim.
+
 ## Workflow levels
 
 ### Minimum
@@ -400,8 +408,8 @@ It:
 3. Builds a compact packet and delegates once to a fresh, write-only
    `@implementer1a` without a task ID.
 4. Runs `.venv/bin/python -m pytest tests/` itself, diffs `git status --short`
-   against the baseline, reads each changed file, and completes a terse coverage
-   matrix.
+   against the baseline, reads each changed file, and completes a readable
+   atomic coverage ledger.
 5. On failure, sends exactly one repair packet to one new `@implementer1a`,
    validates once more, and stops.
 
@@ -424,16 +432,23 @@ exact-match edits within the allowed paths; the whole-file-write instruction
 remains prompt-enforced and should be measured in telemetry.
 
 OpenCode provides no per-agent "one repair" counter, so the single-repair rule
-remains model-enforced. Medium ships one bound the earlier design lacked: a
-configured step cap on the controller converts a runaway loop into a bounded,
-visible failure. A stronger bound is available but deliberately held in reserve.
+remains model-enforced. Medium restores a 25-step controller cap as a circuit
+breaker after telemetry exposed a Phase 2 run that reached 32 turns while
+repeating a misspelled-path read. The cap bounds the cost; it does not repair the
+path or replace the command's fail-fast read rule.
+
+Medium also denies `external_directory`. The same Phase 2 typo would otherwise
+have triggered a learner approval prompt for a path outside the project. The
+denial makes the scope violation visible and keeps the controller in the
+project, while the terminal read-error rule prevents retries.
+
 A `task: {implementer1a: ask}` permission would make each delegation a learner
 click that also serves as a manual repair counter, but telemetry has not yet
 shown a controller delegating in an unbounded way — the recorded doom-loops were
 all implementer-internal (edit retries, repeated pytest), not repeated
-re-delegation. Following note (a), do not impose that click on the learner until
-a run demonstrates the need; keep the step cap, watch the traces, and add the
-gate only if delegation actually runs away.
+re-delegation. Do not impose that click on the learner until a run demonstrates
+the need; watch the traces and add the gate only if delegation actually runs
+away.
 
 Do not force a scout agent to read one or two known files. Prior experiments
 ignored that rule across eight phases because direct reads were cheaper. A

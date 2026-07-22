@@ -3,8 +3,7 @@
 The idea of this project is to show how to steer Local AI agent/model towards better/faster outcomes.
 
 Kostia TODO
-
-- Remove `uv` from prompt1
+- We should 
 
 ## Setup
 
@@ -140,8 +139,7 @@ The command expands into a controller protocol for the main chat. The main batch
 reads, creates one canonical non-duplicative packet, delegates to a fresh write-only `@implementer1a`, validates
 independently with `.venv/bin/python -m pytest tests/` and a `git status --short` baseline diff, then reports an
 outcome sentence, exact pytest summary, compact changed-file list, and an atomic-requirement matrix as one readable
-line per ID. It may
-send exactly one evidence-based repair to a fresh implementer child.
+line per ID. It may send exactly one evidence-based repair to a fresh implementer child.
 
 Medium requires this project-local `opencode.jsonc` configuration:
 
@@ -152,6 +150,7 @@ Medium requires this project-local `opencode.jsonc` configuration:
     "build": {
       "steps": 25,
       "permission": {
+        "external_directory": "deny",
         "task": {
           "*": "deny",
           "implementer1a": "allow"
@@ -162,9 +161,11 @@ Medium requires this project-local `opencode.jsonc` configuration:
 }
 ```
 
-The step cap bounds the controller. The task permission hides every subagent
-except `implementer1a`, which it can delegate to without a learner approval
-prompt. No user-global OpenCode configuration is required.
+The 25-step cap bounds controller drift. `external_directory: deny` prevents a
+mistyped path from opening an approval prompt or escaping the project. The task
+permission hides every subagent except `implementer1a`, which it can delegate
+to without a learner approval prompt. No user-global OpenCode configuration is
+required.
 
 After changing `.opencode` agents, commands, or `opencode.jsonc`, restart the ACP session or IDE before running
 `/phase`. OpenCode can retain an older registered command definition. Commit these control files before resetting a
@@ -180,8 +181,9 @@ What changed from minimum, and why:
    longer trusts the implementer's self-report and the old non-mechanical "terminal validation ordering" rule is
    retired.
 3. The packet is the canonical requirement ledger: every atomic requirement has one ID and exact wording, with no ID
-ranges, duplicate summary, or paraphrase. Independent reads are batched, and the final evidence is one readable
-repo-relative line per ID, preceded by an outcome sentence, the exact pytest summary, and a compact changed-file list. Validation passes
+   ranges, duplicate summary, or paraphrase. Independent reads are batched, and the final evidence is one readable
+   repo-relative line per ID, preceded by an outcome sentence, the exact pytest summary, and a compact changed-file
+   list. Validation passes
    only when pytest passes, every ID has evidence, and no path outside the packet changed. A passing smoke test alone
    cannot conceal a dropped requirement.
 4. The controller has a task-call state machine: it reads targets itself, makes one implementation delegation, then its
@@ -196,6 +198,9 @@ repo-relative line per ID, preceded by an outcome sentence, the exact pytest sum
 7. The implementer's permissions are default-deny: every tool is denied unless explicitly allowed, including any tool an
    IDE client injects. Reads and writes are allowed everywhere except `specs/*` — the implementer structurally cannot
    consult the roadmap and improvise scope — its entire knowledge of the phase is the packet.
-8. The controller is bounded: a step cap on the primary agent converts runaway drift into visible failure.
-9. The command's first line tells the main to refuse to run in a chat with prior phase work. This is model-enforced, but
+8. A 25-step controller cap bounds the retry loop exposed by telemetry: one Phase 2 run reached 32 turns while
+   repeatedly reading a misspelled path. The cap is a circuit breaker, not a fix for the underlying error.
+9. `external_directory: deny` turns a mistyped path into a visible failure instead of a learner approval prompt or an
+   out-of-project read.
+10. The command's first line tells the main to refuse to run in a chat with prior phase work. This is model-enforced, but
    it fails visibly to the learner instead of silently degrading isolation.

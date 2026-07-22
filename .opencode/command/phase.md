@@ -14,7 +14,11 @@ test files yourself; a fresh implementer subagent does all writing.
 1. Run `git status --short` and keep the output as your baseline. In one
    assistant turn, issue a `read` call for every existing writable target.
    Do not delegate discovery or reading, wait between independent reads, or
-   read files that are only read-only dependencies.
+   read files that are only read-only dependencies. If a read of a path that
+   the phase requires to exist returns an error, stop immediately and report
+   the exact path and error; never retry the same failed read or alter its
+   workspace root. A missing path is expected only when the phase explicitly
+   creates that path.
 
 2. Build the canonical ledger and packet directly in the first `task` call; do
    not print a separate ledger or packet in your own response. The packet must
@@ -72,3 +76,6 @@ test files yourself; a fresh implementer subagent does all writing.
    using `Outcome: incomplete — <brief reason>.`, with the final pass-or-fail
    pytest summary, then stop. Never repair twice. A missing environment or
    permission is evidence to report, not something to fix.
+
+   Any post-delegation read error is terminal as well: report the exact path and
+   error, do not retry it, and do not issue another task or validation call.

@@ -2,8 +2,10 @@
   "$schema": "https://opencode.ai/config.json",
   "agent": {
     "build": {
+      "steps": 25,
       // Ordering matters: the specific allow must follow the wildcard deny.
       "permission": {
+        "external_directory": "deny",
         "task": {
           "*": "deny",
           "implementer1a": "allow"
