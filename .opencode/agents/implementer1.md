@@ -6,6 +6,9 @@ mode: subagent
 model: lmstudio/gemma-4-12b-it-mlx
 steps: 12
 permission:
+  edit:
+    "*": allow
+    "specs/*": deny
   bash:
     "*": deny
     ".venv/bin/python -m pytest tests/": allow

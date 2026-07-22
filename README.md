@@ -90,30 +90,39 @@ with its number. The prompt below tells the primary agent to use a fresh
 
 The benefits:
 
-1. *Phase-local scope*. `@implementer1` receives one phase's requirements, named files, and one validation command
-   rather than an open-ended request.
+1. *Phase-local, contract-complete scope*. The parent reads every shared target
+   directly, then gives `@implementer1` one phase's requirements, named files,
+   exact preservation requirements, and one validation command rather than an
+   open-ended request.
 
 2. *Fresh, single-purpose implementer*. A new @implementer1 has one job: implement one scoped phase. It avoids the
    parent’s accumulated context and prevents planning, design, and broad exploration from consuming the small model’s
    budget.
 
-3. *One validation path and hard discovery boundaries*. The only permitted Bash command is the specified validation
-   command, preventing recursive listings, environment activation, and other dives into `.venv`. `glob` is also
-   disabled, so an incomplete packet fails visibly instead of triggering broad repository discovery. The agent reports
-   the exact result and does not diagnose or repair after validation. This baseline exposes failures without starting a
-   repair loop; it is not independent verification.
+3. *One validation path and hard discovery boundaries*. The only permitted Bash
+   command is the direct-venv validation command, preventing recursive listings,
+   environment activation, and other dives into `.venv`. `glob` is also disabled,
+   so an incomplete packet fails visibly instead of triggering broad repository
+   discovery. The agent reports the exact result and does not diagnose or repair
+   after validation. Treat the requested terminal ordering as a policy to inspect
+   in telemetry, not as a mechanical guarantee; the Bash allowlist does not stop
+   a later write tool call.
 
 Notes:
 
-a. Even though we give explicit instructions (e.g. the parent shouldn't run pytest), sometimes these get ignored.
+a. Model instructions can still be ignored. Use telemetry to see what actually
+happened before adding another rule.
 
-b. Make sure to replace the `uv` part (including the use of `pyproject.toml`) with regular venv/pip use if that's your
-setup.
+b. Ensure `.venv/bin/python -m pytest tests/` matches the implementer's Bash
+allowlist. Pointing directly at the virtual environment works whether or not the
+project uses `uv`.
 
-c. We need to do each phase in a new parent chat. We'll tackle that with an orchestrator in Lesson 12.
+c. Plain Minimum works best from a fresh parent chat per phase. Minimum Plus
+below also creates a fresh phase runner for every invocation, but a fresh
+parent chat remains the strongest isolation.
 
-d. Explain that all of this extra text is from potholes. You might also hit some. When you do, look at the telemetry.
-We'll tackle this in the next lesson.
+d. These constraints came from observed potholes. Keep the prompt only as strict
+as the telemetry evidence requires.
 
 ```markdown
 Read @specs/mission.md, @specs/tech-stack.md, and @specs/roadmap.md. Run only Phase N.
@@ -121,8 +130,9 @@ Read @specs/mission.md, @specs/tech-stack.md, and @specs/roadmap.md. Run only Ph
 Read the phase's target files, then delegate this phase exactly once to a fresh `@implementer1` subagent with a compact,
 self-contained packet: repo-relative writable paths, complete required final state, and exact behavior/tests to
 preserve. Do not refer the child to specification files or include file contents.
-Do not author, draft, quote, or dictate implementation code—including tests or templates—in the delegation packet;
-provide requirements and acceptance criteria only, and leave all file contents for `@implementer1` to design and write.
+Do not provide complete files, complete functions, code blocks, pseudocode, or line-by-line implementations. Include
+exact literals, imports, route signatures, API constraints, test semantics, and preserved behavior when they are
+contract requirements.
 
 Include this exact instruction: "For every writable file, use `write` with its complete final content; never use
 `edit`." Do not modify phase files or use another agent.
@@ -133,6 +143,29 @@ Tell the child this is its final tool call and it must stop whether it passes or
 After it returns, use only `read` on the reported changed files. Do not use Bash, glob, task, edit, or write. Report the
 exact validation result, files changed, and only critical contract violations: missing required strings, routes,
 imports, or unexpected files.
+```
+
+### Minimum Plus
+
+Use this when you want the same phase-local implementation context with a much
+shorter kickoff prompt. `@implementer1a` is a fresh, self-contained phase
+runner: it reads the local specifications and existing targets, implements one
+phase, and runs the direct-venv test command. Its OpenCode permissions deny
+delegation, `edit`, and broad discovery, and allow only the direct-venv test
+command through Bash. It uses complete-file `write` operations and direct reads.
+
+This removes the handoff packet and nested orchestration layer. The tradeoff is
+deliberate: the phase runner validates its own work, so there is no separate
+agent independently inspecting the result. Use the longer Minimum workflow
+above when an independently constructed packet and parent-side inspection are
+more important than a short prompt.
+
+Use your normal primary agent. A fresh main chat per phase remains the most
+isolated setup, but every `@implementer1a` invocation creates a fresh child even
+when you reuse a longer-running main chat.
+
+```markdown
+@implementer1a Run Phase N.
 ```
 
 ### Medium prompt
