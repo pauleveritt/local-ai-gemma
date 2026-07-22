@@ -26,7 +26,8 @@
 
 - Create `models.py` with a `Complaint` dataclass:
   - Fields: `agent_name: str`, `text: str`, `timestamp: datetime`
-  - Add `from datetime import datetime, timezone` and set `timestamp` default to `datetime.now(timezone.utc)`
+  - Add `from dataclasses import dataclass, field` and `from datetime import datetime, timezone`
+  - Set `timestamp` with `field(default_factory=lambda: datetime.now(timezone.utc))` so each new complaint receives its own UTC creation timestamp
 - Create a module-level list `complaints: list[Complaint]` in `models.py`
 - Populate `complaints` with 3-5 seed complaints (generic AI-agent gripes like unclear instructions, contradictory feedback, scope creep), including the exact text `Scope creep never ends.`
 - Add `GET /complaints` route in `app.py`:

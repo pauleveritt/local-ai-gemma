@@ -136,13 +136,17 @@ imports, or unexpected files.
 
 Start a fresh main chat and type `/phase N`. Use your normal primary agent; no UI agent selection is required.
 
-The command expands into a controller protocol for the main chat. The main authors a handoff packet, delegates to a
-fresh write-only `@implementer1a`, validates independently with `.venv/bin/python -m pytest tests/` and a `git
-status --short` baseline diff, reports a coverage matrix, and may send exactly one repair to one fresh implementer
-child.
+The command expands into a controller protocol for the main chat. The main creates one canonical packet, delegates to
+a fresh write-only `@implementer1a`, validates independently with `.venv/bin/python -m pytest tests/`, a `git
+status --short` baseline diff, and an atomic-requirement matrix, then may send exactly one evidence-based repair to a
+fresh implementer child.
 
 The medium tier expects both Gemma provider entries in the user-global
 `~/.config/opencode/opencode.jsonc` to set `limit.output` to `4096`.
+
+After changing `.opencode` agents, commands, or `opencode.jsonc`, restart the ACP session or IDE before running
+`/phase`. OpenCode can retain an older registered command definition. Commit these control files before resetting a
+phase worktree so a broad reset cannot silently restore an older workflow.
 
 What changed from minimum, and why:
 
@@ -153,15 +157,23 @@ What changed from minimum, and why:
    validation command itself and diffs `git status --short` against a pre-delegation baseline, so scope checking no
    longer trusts the implementer's self-report and the old non-mechanical "terminal validation ordering" rule is
    retired.
-3. One repair is now allowed: exactly one delegation to a *fresh* implementer child carrying only the implicated file
-   names, the exact pytest failure, and the required fix — never file contents, which would risk truncation under the
-   model's output cap. The repair child reads the named files itself and rewrites complete files, so the edit-anchor
-   (`oldString`) failure mode never applies.
-4. The implementer's permissions are default-deny: every tool is denied unless explicitly allowed, including any tool an
+3. The packet is the canonical requirement ledger: every atomic requirement has one ID and exact wording, with no ID
+   ranges or paraphrase. Validation passes only when pytest passes, every ID has evidence, and no path outside the
+   packet changed. A passing smoke test alone cannot conceal a dropped requirement.
+4. The controller has a task-call state machine: it reads targets itself, makes one implementation delegation, then its
+   next tool call must be pytest. A second fresh implementer is permitted only after pytest and an explicit failed
+   requirement; it cannot replace an ambiguous but completed first task.
+5. One repair is now allowed: exactly one delegation to a *fresh* implementer child carrying only implicated file names
+   and roles, failed requirement IDs with expected and observed evidence, the required fix, and pytest output when
+   pytest failed — never file contents, which would risk truncation under the model's output cap. The repair child reads
+   the named files itself and rewrites complete files, so the edit-anchor (`oldString`) failure mode never applies.
+6. The project build agent can call only `@implementer1a`; `@explore`, `@general`, and any other subagent are denied by
+   the project `opencode.jsonc`. This makes the two-agent boundary enforceable instead of relying solely on prose.
+7. The implementer's permissions are default-deny: every tool is denied unless explicitly allowed, including any tool an
    IDE client injects. Reads and writes are allowed everywhere except `specs/*` — the implementer structurally cannot
    consult the roadmap and improvise scope — its entire knowledge of the phase is the packet.
-5. The controller is bounded: a step cap on the primary agent converts runaway drift into visible failure.
-6. The Gemma model entries raise `limit.output` to 4096 so packets and coverage matrices are not truncated mid-message;
+8. The controller is bounded: a step cap on the primary agent converts runaway drift into visible failure.
+9. The Gemma model entries raise `limit.output` to 4096 so packets and coverage matrices are not truncated mid-message;
    packets must still stay terse and never inline file contents.
-7. The command's first line tells the main to refuse to run in a chat with prior phase work. This is model-enforced, but
+10. The command's first line tells the main to refuse to run in a chat with prior phase work. This is model-enforced, but
    it fails visibly to the learner instead of silently degrading isolation.
