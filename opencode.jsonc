@@ -5,11 +5,12 @@
       // Circuit breaker for the medium controller; a clean phase run needs
       // ~15-18 steps, so 25 allows one full run plus one repair, never two.
       "steps": 25,
-      // Ordering matters: the specific allow must follow the wildcard deny.
+      // Ordering matters: the specific ask must follow the wildcard deny.
       "permission": {
         "task": {
           "*": "deny",
-          "implementer1a": "allow"
+          // The learner approves each implementation or repair delegation.
+          "implementer1a": "ask"
         }
       }
     }

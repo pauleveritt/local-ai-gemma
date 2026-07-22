@@ -168,7 +168,8 @@ What changed from minimum, and why:
    pytest failed — never file contents, which would risk truncation under the model's output cap. The repair child reads
    the named files itself and rewrites complete files, so the edit-anchor (`oldString`) failure mode never applies.
 6. The project build agent can call only `@implementer1a`; `@explore`, `@general`, and any other subagent are denied by
-   the project `opencode.jsonc`. This makes the two-agent boundary enforceable instead of relying solely on prose.
+   the project `opencode.jsonc`. The learner must approve each implementation or repair delegation, making the repair
+   counter visible as well as enforceable in the prompt.
 7. The implementer's permissions are default-deny: every tool is denied unless explicitly allowed, including any tool an
    IDE client injects. Reads and writes are allowed everywhere except `specs/*` — the implementer structurally cannot
    consult the roadmap and improvise scope — its entire knowledge of the phase is the packet.
