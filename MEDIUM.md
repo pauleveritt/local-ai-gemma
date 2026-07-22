@@ -144,14 +144,7 @@ do not mention it or PyCharm anywhere in the README.
     "build": {
       // Circuit breaker for the medium controller; a clean phase run needs
       // ~15-18 steps, so 25 allows one full run plus one repair, never two.
-      "steps": 25,
-      "permission": {
-        "task": {
-          // The learner clicks to approve each delegation: a visible handoff
-          // and a manual repair counter.
-          "implementer1a": "ask"
-        }
-      }
+      "steps": 25
     }
   }
 }
@@ -219,10 +212,7 @@ not modify) and the rewritten `implementer1a.md`.
        implementer structurally cannot consult the roadmap and improvise
        scope; its entire knowledge of the phase is the packet.
     5. The controller is bounded: a step cap on the primary agent converts
-       runaway drift into visible failure, and each delegation requires a
-       click-through approval that doubles as a manual repair counter. (If
-       the approval dialog offers "always", declining to use it keeps the
-       counter working.)
+       runaway drift into visible failure.
     6. The Gemma model entries raise `limit.output` to 4096 so packets and
        coverage matrices are not truncated mid-message; packets must still
        stay terse and never inline file contents.

@@ -72,9 +72,18 @@ phase contract.
 
 For a modest workflow, the parent agent can be the orchestrator and verifier;
 adding a separate orchestrator subagent otherwise creates another reasoning hop
-and another chance for context drift. In a repeatable production system, a
-dedicated orchestrator and mechanical verifier are worthwhile because they move
-loop control outside the SLM.
+and another chance for context drift. That hop is not only a drift risk. When a
+parent must relay an instruction it did not author, it tends to paraphrase: in
+one recorded run the parent turned a delegated `Run Phase 1` into `read the
+specs and provide a summary`, so no implementer ever launched. The durable
+principle is that a handoff packet is trustworthy when the agent that authored
+it is the same agent that sends it; the lossy step is a model relaying another
+party's instruction verbatim. OpenCode also caps subagent nesting at depth 1 by
+default, so a `main -> orchestrator -> implementer` shape fails mechanically
+unless you raise `subagent_depth` — a further reason to let one parent own
+orchestration and delegate a single level to the implementer. In a repeatable
+production system, a dedicated orchestrator and mechanical verifier are still
+worthwhile because they move loop control outside the SLM.
 
 A 12B or 27B orchestrator should still be procedural rather than deliberative.
 It has enough headroom to read named files, construct a packet, run a fixed test
@@ -137,6 +146,18 @@ layer. Allow narrow discovery such as `rg --files`, named-file reads, and the
 project's validation command. Prompt guidance is useful, but an enforced tool
 policy is what removes this failure mode.
 
+An allowlist is only as tight as the tools it can see. A denied Bash command
+does not stop a model that reaches for a different tool: in one run a child hit
+its denied `ls` calls, then routed the same intent through an editor-injected
+shell tool it had never been told to avoid, and burned its whole step budget
+without delegating. Prefer a default-deny permission ruleset (`"*": deny` with
+explicit allows) to naming individual denied commands, because default-deny also
+hides tools an editor or client injects at runtime that no allowlist
+anticipated. Path patterns compose with this: because `read` and `edit`
+permissions match worktree-relative paths, denying `specs/*` on both makes an
+implementer structurally unable to consult the roadmap or rewrite the contract,
+so its entire knowledge of a phase is the packet it was handed.
+
 ## 9. Keep context deliberately small and clean
 
 A new parent chat is not magic: when every phase already has a fresh child, the
@@ -146,8 +167,13 @@ and validation evidence fit within it.
 
 The coding profile used `context: 40960`, `input: 32768`, and `output: 2048` to
 avoid compaction pressure while bounding oversized completions and repair tails.
-The goal is not maximum context. It is enough room for a small, clean task plus
-validation, with a budget that makes a bad tool choice visible and bounded.
+The output cap was later raised to 4096: in the medium workflow the delegation
+packet and coverage matrix are themselves model output, and 2048 risked
+truncating a `task` call mid-argument. The correction is paired, not just
+larger: raise the cap for safety margin, and design packets that never inline
+file contents so they stay far below it. The goal is not maximum context. It is
+enough room for a small, clean task plus validation, with a budget that makes a
+bad tool choice visible and bounded.
 
 ## 10. Choose the exact model and tune it for the role
 
@@ -181,13 +207,14 @@ as new or shared and state the routes, tests, strings, and behavior that must
 survive. The implementer reads every existing target completely before editing;
 otherwise a phase can pass its new smoke test while erasing earlier behavior.
 
-In the medium workflow, the implementer is write-only. The orchestrator runs
-the project's declared validation command, compares the changed files with the
-packet, and checks exact contract strings after the child returns. Do not make both
-roles own repair. Disable planning/design skills for routine implementation and
-avoid opportunistic linters, type checkers, or shell activation.
+In the medium workflow, the implementer is write-only. The parent controller
+runs the project's declared validation command, compares the changed files with
+the packet, and checks exact contract strings after the child returns. Do not
+make both roles own repair. Disable planning/design skills for routine
+implementation and avoid opportunistic linters, type checkers, or shell
+activation.
 
-If the child needs more information, the orchestrator should provide a narrower
+If the child needs more information, the controller should provide a narrower
 packet rather than asking the child to explore the entire repository. Use a hard
 step cap as a circuit breaker, not as a solution: it bounds a runaway run but
 does not fix a bad packet, stale edit anchor, or semantic trap.
@@ -217,9 +244,14 @@ producing edit retries that consumed turns without making the intended change.
 This was a broad failure mode, not one malformed `__main__` literal: the session
 record contained 27 `oldString` mismatches across blind edits, stale content,
 whitespace and escaping differences, empty anchors, and late-session collapse.
-A repair packet should provide the current file contents and required final
-state. When the packet grants complete ownership of a small file, ask a fresh
-child for a full-file write; do not ask it to apply an `oldString` patch.
+A repair packet should name the implicated files and state the exact failure
+and required final state — not inline the current file contents, which pays for
+the content twice in a small context and risks truncating the delegation under
+the output cap. The fresh repair child reads the named files itself, then
+writes. When the packet grants complete ownership of a small file, ask a fresh
+child for a full-file write; do not ask it to apply an `oldString` patch. The
+read-then-rewrite repair flow never touches an edit anchor, so this failure
+mode cannot recur there.
 
 Whole-file writes are unsafe when another phase owns part of the file: they can
 erase routes, imports, or behavior that must survive. Use one only when the
@@ -239,10 +271,10 @@ paths that ordinary request tests do not cover.
 
 For medium, encode the few known, phase-relevant facts directly in the packet.
 Do not attach general framework documentation to every run. Context7 or another
-documentation retriever belongs in maximum: the orchestrator should consult it
-only for a real API uncertainty, then compress the answer into one concrete rule
-for the implementer. This preserves the benefit without paying the full context
-cost in both agent roles.
+documentation retriever is out of scope for this course's tiers: a controller
+should consult one only for a real API uncertainty, then compress the answer
+into one concrete rule for the implementer. This preserves the benefit without
+paying the full context cost in both agent roles.
 
 Do not silently repair a minimum run. In one recorded run, the child received
 the instruction to repair until tests passed even though its agent contract said
@@ -310,6 +342,12 @@ first failure when one occurred. "Validation successful" or "no critical
 violations" is not evidence. Read the child tool output, the changed files,
 and the changed-file set; never infer a clean run from the child summary.
 
+The medium workflow removes this failure mode at the source rather than patching
+it with wording: the implementer is given no Bash at all, so it cannot run or
+re-run validation, and the parent owns the single test call. Terminal-validation
+wording is a minimum-only patch for a writer that can also validate; where the
+writer cannot validate, there is nothing to make terminal.
+
 ## 17. Compare parent models with raw timing, not session lifetime
 
 In controlled Phase 1 comparisons, an oMLX Gemma parent used fewer turns and
@@ -330,63 +368,87 @@ context number does not by itself prove lower latency or better orchestration.
 
 ### Minimum
 
-Minimum uses one fresh `@implementer1` chat for a single roadmap phase. The
-implementer reads the named specifications, makes the requested edits, runs
-the validation command exactly once as its final tool call, and reports the
-exact command and result; it does not repair afterward. The parent then reads
-the changed files and reports only critical contract violations. Its deliberate
-limitation is that validation is self-reported rather than independent.
+Minimum uses one fresh main chat per phase with a hand-typed prompt. The parent
+reads the specifications and the phase's target files, then delegates once to a
+fresh `@implementer1` with a self-contained packet. The implementer makes the
+requested edits, runs the validation command exactly once as its final tool
+call, and reports the exact command and result; it does not repair afterward.
+The parent then reads the changed files and reports critical contract
+violations. `implementer1` denies writes under `specs/*`, so it cannot rewrite
+the contract while implementing. The deliberate limitation is that validation is
+self-reported by the writer rather than run independently.
 
 ### Medium
 
-Medium moves the stable protocol into a phase-local `orchestrator2` primary
-agent so the kickoff can be as small as `Run Phase N from @specs/roadmap.md`.
-The design must remain workable on Gemma 4 12B, though a 27B model provides more
-margin. The orchestrator:
+Medium replaces the hand-typed prompt with a `/phase N` command, so the learner
+kickoff is a single line. The command template is delivered to the main chat
+verbatim — OpenCode substitutes `$ARGUMENTS` and does not let a model paraphrase
+it — which removes the kickoff-rewrite failure that broke earlier nested
+designs. The specifications are attached to the command with `@`-references, so
+their content arrives with the message instead of costing separate tool calls.
+An earlier attempt moved the protocol into a phase-local `orchestrator2` primary
+agent; that added a reasoning hop and depended on a client exposing custom
+primary-agent selection, and it was dropped in favor of the command.
 
-1. Reads the mission, stack, requested phase, and current target files.
-2. Records the existing changed-file baseline and constructs a compact packet.
-3. Starts a fresh, write-only `@implementer2` without a task ID.
-4. Runs pytest, compares changed files, and checks exact required and preserved
-   strings itself.
-5. On failure, may send one exact repair packet to one new child, validate once
-   more, and then stop.
+The main chat is the controller and verifier; there is no orchestrator subagent.
+It:
 
-The repair child receives the failing command or contract check, exact output,
-current allowed file contents, and required final state. It never inherits the
-first child's tool history. This single repair is the best-case design to test,
-not an established guarantee: earlier validate-and-redelegate experiments were
-reverted after edit-anchor failures. If telemetry shows the orchestrator cannot
-reliably stop after one repair, medium should report the failure instead and
-leave automatic repair for maximum.
+1. Refuses to run if the chat already contains prior phase work. This is
+   model-enforced, but it fails visibly to the learner instead of silently
+   degrading isolation.
+2. Reads the phase's target files and records the `git status --short` baseline.
+3. Builds a compact packet and delegates once to a fresh, write-only
+   `@implementer1a` without a task ID.
+4. Runs `.venv/bin/python -m pytest tests/` itself, diffs `git status --short`
+   against the baseline, reads each changed file, and completes a terse coverage
+   matrix.
+5. On failure, sends exactly one repair packet to one new `@implementer1a`,
+   validates once more, and stops.
 
-OpenCode does not provide a per-agent "one repair task" counter. The one-repair
-rule still depends on the orchestrator remembering it; the 16-step agent cap is
-the only mechanical bound in medium. Measure this explicitly rather than
-describing the prompt rule as enforced loop control.
+Validation moved from the implementer to the controller: `implementer1a` has no
+Bash at all, so scope checking no longer trusts the writer's self-report, and
+the minimum-only terminal-validation rule is retired. The repair packet names
+the implicated files, the exact failing output, and the required fix; it never
+inlines file contents, which would pay for them twice in a small context and
+risk truncating the delegation under the output cap. The fresh repair child
+reads the named files and writes complete files, so the `oldString` failure mode
+cannot recur.
 
-Because this course uses small files and `oldString` failures were severe,
-`implementer2` is instructed to read each named existing file completely and
-write its complete final content, preserving all shared content named by the
-packet. Current OpenCode maps both `edit` and `write` to the same `edit`
-permission, so medium cannot mechanically expose `write` while denying
-exact-match edits. Treat compliance as an experiment to measure. Maximum should
-replace this prompt rule with a tool policy or deterministic structural
-transform, especially for larger or concurrently owned files.
+`implementer1a` uses a default-deny permission ruleset: every tool is denied
+except `read` and `write`, and both deny `specs/*`. The implementer therefore
+cannot consult the roadmap and improvise scope — its entire knowledge of the
+phase is the packet — and cannot reach an editor-injected shell tool to escape
+its constraints. Because current OpenCode maps `edit` and `write` to the same
+`edit` permission, medium still cannot expose `write` while mechanically denying
+exact-match edits within the allowed paths; the whole-file-write instruction
+remains prompt-enforced and should be measured in telemetry.
+
+OpenCode provides no per-agent "one repair" counter, so the single-repair rule
+remains model-enforced. Medium ships one bound the earlier design lacked: a
+configured step cap on the controller converts a runaway loop into a bounded,
+visible failure. A stronger bound is available but deliberately held in reserve.
+A `task: {implementer1a: ask}` permission would make each delegation a learner
+click that also serves as a manual repair counter, but telemetry has not yet
+shown a controller delegating in an unbounded way — the recorded doom-loops were
+all implementer-internal (edit retries, repeated pytest), not repeated
+re-delegation. Following note (a), do not impose that click on the learner until
+a run demonstrates the need; keep the step cap, watch the traces, and add the
+gate only if delegation actually runs away.
 
 Do not force a scout agent to read one or two known files. Prior experiments
 ignored that rule across eight phases because direct reads were cheaper. A
 read-only scout is useful only for genuine cross-file searches or convention
 discovery.
 
-### Maximum boundary
+### Out of scope
 
-Maximum adds controls whose setup or context cost is too high for the teaching
-baseline: mechanically enforced tool-output limits, structural navigation or
-LSP checks, deterministic transforms, on-demand Context7 research, richer
-contract tests, telemetry-driven model verification, and externally enforced
-repair budgets. These belong outside the small implementer's prompt whenever a
-tool can own them more reliably.
+This course stops at minimum and medium. Some controls raise reliability further
+but cost more setup or context than a teaching baseline should: mechanically
+enforced tool-output limits, structural navigation or LSP checks, deterministic
+`write`-path transforms, on-demand Context7 research, richer contract tests,
+telemetry-driven model verification, and externally enforced repair budgets.
+They record the direction a production system would take, not a tier this
+repository implements.
 
 ## Evidence sources
 

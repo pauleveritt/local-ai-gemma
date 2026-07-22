@@ -15,8 +15,8 @@ uv sync --frozen
 uv run --frozen python -m pytest tests/
 ```
 
-Do not change dependencies between minimum and medium. The specification and `uv.lock` are part of the
-experiment; changing versions after a run makes the comparison invalid.
+Do not change dependencies between minimum and medium. The specification and `uv.lock` are part of the experiment;
+changing versions after a run makes the comparison invalid.
 
 ## New sections
 
@@ -86,49 +86,40 @@ with its number. The prompt below tells the primary agent to use a fresh
 
 The benefits:
 
-1. *Phase-local, contract-complete scope*. The parent reads every shared target
-   directly, then gives `@implementer1` one phase's requirements, named files,
-   exact preservation requirements, and one validation command rather than an
+1. *Phase-local, contract-complete scope*. The parent reads every shared target directly, then gives `@implementer1` one
+   phase's requirements, named files, exact preservation requirements, and one validation command rather than an
    open-ended request.
 
 2. *Fresh, single-purpose implementer*. A new @implementer1 has one job: implement one scoped phase. It avoids the
    parent’s accumulated context and prevents planning, design, and broad exploration from consuming the small model’s
    budget.
 
-3. *One validation path and hard discovery boundaries*. The only permitted Bash
-   command is the direct-venv validation command, preventing recursive listings,
-   environment activation, and other dives into `.venv`. `glob` is also disabled,
-   so an incomplete packet fails visibly instead of triggering broad repository
-   discovery. The agent reports the exact result and does not diagnose or repair
-   after validation. Treat the requested terminal ordering as a policy to inspect
-   in telemetry, not as a mechanical guarantee; the Bash allowlist does not stop
-   a later write tool call.
+3. *One validation path and hard discovery boundaries*. The only permitted Bash command is the direct-venv validation
+   command, preventing recursive listings, environment activation, and other dives into `.venv`. `glob` is also
+   disabled, so an incomplete packet fails visibly instead of triggering broad repository discovery. The agent reports
+   the exact result and does not diagnose or repair after validation. Treat the requested terminal ordering as a policy
+   to inspect in telemetry, not as a mechanical guarantee; the Bash allowlist does not stop a later write tool call.
 
 Notes:
 
-a. Model instructions can still be ignored. Use telemetry to see what actually
-happened before adding another rule.
+a. Model instructions can still be ignored. Use telemetry to see what actually happened before adding another rule.
 
-b. Ensure `.venv/bin/python -m pytest tests/` matches the implementer's Bash
-allowlist. Pointing directly at the virtual environment works whether or not the
-project uses `uv`.
+b. Ensure `.venv/bin/python -m pytest tests/` matches the implementer's Bash allowlist. Pointing directly at the virtual
+environment works whether or not the project uses `uv`.
 
-c. Plain Minimum works best from a fresh parent chat per phase. Medium below
-also creates a fresh phase runner for every invocation, but a fresh
-parent chat remains the strongest isolation.
+c. Plain Minimum works best from a fresh parent chat per phase. Medium below also creates a fresh phase runner for every
+invocation, but a fresh parent chat remains the strongest isolation.
 
-d. These constraints came from observed potholes. Keep the prompt only as strict
-as the telemetry evidence requires.
+d. These constraints came from observed potholes. Keep the prompt only as strict as the telemetry evidence requires.
 
 ```markdown
 Read @specs/mission.md, @specs/tech-stack.md, and @specs/roadmap.md. Run only Phase N.
 
 Read the phase's target files, then delegate this phase exactly once to a fresh `@implementer1` subagent with a compact,
 self-contained packet: repo-relative writable paths, complete required final state, and exact behavior/tests to
-preserve. Do not refer the child to specification files or include file contents.
-Do not provide complete files, complete functions, code blocks, pseudocode, or line-by-line implementations. Include
-exact literals, imports, route signatures, API constraints, test semantics, and preserved behavior when they are
-contract requirements.
+preserve. Do not refer the child to specification files or include file contents. Do not provide complete files,
+complete functions, code blocks, pseudocode, or line-by-line implementations. Include exact literals, imports, route
+signatures, API constraints, test semantics, and preserved behavior when they are contract requirements.
 
 Include this exact instruction: "For every writable file, use `write` with its complete final content; never use
 `edit`." Do not modify phase files or use another agent.
@@ -143,46 +134,34 @@ imports, or unexpected files.
 
 ### Medium
 
-Start a fresh main chat and type `/phase N`. Use your normal primary agent; no
-UI agent selection is required.
+Start a fresh main chat and type `/phase N`. Use your normal primary agent; no UI agent selection is required.
 
-The command expands into a controller protocol for the main chat. The main
-authors a handoff packet, delegates to a fresh write-only `@implementer1a`,
-validates independently with `.venv/bin/python -m pytest tests/` and a `git
-status --short` baseline diff, reports a coverage matrix, and may send exactly
-one repair to one fresh implementer child.
+The command expands into a controller protocol for the main chat. The main authors a handoff packet, delegates to a
+fresh write-only `@implementer1a`, validates independently with `.venv/bin/python -m pytest tests/` and a `git
+status --short` baseline diff, reports a coverage matrix, and may send exactly one repair to one fresh implementer
+child.
 
 The medium tier expects both Gemma provider entries in the user-global
 `~/.config/opencode/opencode.jsonc` to set `limit.output` to `4096`.
 
 What changed from minimum, and why:
 
-1. The protocol is delivered by a command, not typed: `$ARGUMENTS` is
-   substituted and the template reaches the main verbatim, so the learner
-   prompt shrinks to `/phase N` and paraphrase drift at kickoff is eliminated.
-   The command guarantees the protocol is *received*, not that it is
-   *followed*; telemetry remains the check.
-2. Validation moved from the implementer to the main chat. The implementer
-   has no Bash at all; the main runs the one validation command itself and
-   diffs `git status --short` against a pre-delegation baseline, so scope
-   checking no longer trusts the implementer's self-report and the old
-   non-mechanical "terminal validation ordering" rule is retired.
-3. One repair is now allowed: exactly one delegation to a *fresh* implementer
-   child carrying only the implicated file names, the exact pytest failure,
-   and the required fix — never file contents, which would risk truncation
-   under the model's output cap. The repair child reads the named files itself
-   and rewrites complete files, so the edit-anchor (`oldString`) failure mode
-   never applies.
-4. The implementer's permissions are default-deny: every tool is denied unless
-   explicitly allowed, including any tool an IDE client injects. Reads and
-   writes are allowed everywhere except `specs/*` — the implementer structurally cannot consult the roadmap and improvise scope — its entire knowledge of the phase is the packet.
-5. The controller is bounded: a step cap on the primary agent converts runaway
-   drift into visible failure, and each delegation requires a click-through
-   approval that doubles as a manual repair counter. (If the approval dialog
-   offers "always", declining to use it keeps the counter working.)
-6. The Gemma model entries raise `limit.output` to 4096 so packets and coverage
-   matrices are not truncated mid-message; packets must still stay terse and
-   never inline file contents.
-7. The command's first line tells the main to refuse to run in a chat with
-   prior phase work. This is model-enforced, but it fails visibly to the
-   learner instead of silently degrading isolation.
+1. The protocol is delivered by a command, not typed: `$ARGUMENTS` is substituted and the template reaches the main
+   verbatim, so the learner prompt shrinks to `/phase N` and paraphrase drift at kickoff is eliminated. The command
+   guarantees the protocol is *received*, not that it is *followed*; telemetry remains the check.
+2. Validation moved from the implementer to the main chat. The implementer has no Bash at all; the main runs the one
+   validation command itself and diffs `git status --short` against a pre-delegation baseline, so scope checking no
+   longer trusts the implementer's self-report and the old non-mechanical "terminal validation ordering" rule is
+   retired.
+3. One repair is now allowed: exactly one delegation to a *fresh* implementer child carrying only the implicated file
+   names, the exact pytest failure, and the required fix — never file contents, which would risk truncation under the
+   model's output cap. The repair child reads the named files itself and rewrites complete files, so the edit-anchor
+   (`oldString`) failure mode never applies.
+4. The implementer's permissions are default-deny: every tool is denied unless explicitly allowed, including any tool an
+   IDE client injects. Reads and writes are allowed everywhere except `specs/*` — the implementer structurally cannot
+   consult the roadmap and improvise scope — its entire knowledge of the phase is the packet.
+5. The controller is bounded: a step cap on the primary agent converts runaway drift into visible failure.
+6. The Gemma model entries raise `limit.output` to 4096 so packets and coverage matrices are not truncated mid-message;
+   packets must still stay terse and never inline file contents.
+7. The command's first line tells the main to refuse to run in a chat with prior phase work. This is model-enforced, but
+   it fails visibly to the learner instead of silently degrading isolation.
