@@ -15,7 +15,7 @@ uv sync --frozen
 uv run --frozen python -m pytest tests/
 ```
 
-Do not change dependencies between minimum, medium, and maximum. The specification and `uv.lock` are part of the
+Do not change dependencies between minimum and medium. The specification and `uv.lock` are part of the
 experiment; changing versions after a run makes the comparison invalid.
 
 ## New sections
@@ -24,10 +24,6 @@ experiment; changing versions after a run makes the comparison invalid.
 - Gemma 12, 26, DeepSeek Flash
 - Explain why SLMs need so much help
 - Qwen as big brain
-- Options for maxiumum
-    - LSP, RTK, Context7, caveman, speculative decoding, AFM
-    - More subagents: validator, researcher (Context7), planner (roadmap)
-    -
 
 ## Model config
 
@@ -48,7 +44,7 @@ The LM Studio baseline came from the Gemma 4 12B IT MLX model metadata and the g
   "coding_profile": {
     "context": 40960,
     "input": 32768,
-    "output": 2048,
+    "output": 4096,
     "temperature": 0.2,
     "top_p": 0.9,
     "top_k": 64
@@ -63,7 +59,7 @@ The LM Studio baseline came from the Gemma 4 12B IT MLX model metadata and the g
 - `context`: `40960` gives the parent and implementer room for tool results without reopening the earlier
   unbounded-context behavior.
 - `input`: `32768` reserves part of the context budget for generated output and tool-call continuation.
-- `output`: `2048` is enough for routine implementation while limiting runaway reasoning and repair loops.
+- `output`: `4096` keeps medium-tier packets and coverage matrices from truncating mid-message.
 - `temperature`: The native `1.0` setting is useful for general generation; `0.2` is more stable for repetitive code
   edits.
 - `top_p`: The native `0.95` setting is retained for broad generation, while `0.9` narrows the coding distribution.
@@ -117,8 +113,8 @@ b. Ensure `.venv/bin/python -m pytest tests/` matches the implementer's Bash
 allowlist. Pointing directly at the virtual environment works whether or not the
 project uses `uv`.
 
-c. Plain Minimum works best from a fresh parent chat per phase. Minimum Plus
-below also creates a fresh phase runner for every invocation, but a fresh
+c. Plain Minimum works best from a fresh parent chat per phase. Medium below
+also creates a fresh phase runner for every invocation, but a fresh
 parent chat remains the strongest isolation.
 
 d. These constraints came from observed potholes. Keep the prompt only as strict
@@ -145,58 +141,48 @@ exact validation result, files changed, and only critical contract violations: m
 imports, or unexpected files.
 ```
 
-### Minimum Plus
+### Medium
 
-Use this when you want the same phase-local implementation context with a much
-shorter kickoff prompt. `@implementer1a` is a fresh, self-contained phase
-runner: it reads the local specifications and existing targets, implements one
-phase, and runs the direct-venv test command. Its OpenCode permissions deny
-delegation, `edit`, and broad discovery, and allow only the direct-venv test
-command through Bash. It uses complete-file `write` operations and direct reads.
+Start a fresh main chat and type `/phase N`. Use your normal primary agent; no
+UI agent selection is required.
 
-This removes the handoff packet and nested orchestration layer. The tradeoff is
-deliberate: the phase runner validates its own work, so there is no separate
-agent independently inspecting the result. Use the longer Minimum workflow
-above when an independently constructed packet and parent-side inspection are
-more important than a short prompt.
+The command expands into a controller protocol for the main chat. The main
+authors a handoff packet, delegates to a fresh write-only `@implementer1a`,
+validates independently with `.venv/bin/python -m pytest tests/` and a `git
+status --short` baseline diff, reports a coverage matrix, and may send exactly
+one repair to one fresh implementer child.
 
-Use your normal primary agent. A fresh main chat per phase remains the most
-isolated setup, but every `@implementer1a` invocation creates a fresh child even
-when you reuse a longer-running main chat.
+The medium tier expects both Gemma provider entries in the user-global
+`~/.config/opencode/opencode.jsonc` to set `limit.output` to `4096`.
 
-```markdown
-@implementer1a Run Phase N.
-```
+What changed from minimum, and why:
 
-### Medium prompt
-
-Use the project `orchestrator2` as the primary agent. It prepares the handoff for a write-only `@implementer2`,
-validates the result independently, and may send one exact failure to one fresh repair child. Both roles use Gemma 4 12B
-so the orchestrator is deliberately procedural rather than a general code reviewer.
-
-The benefits over minimum:
-
-1. *A reusable orchestration contract*. Packet construction, validation, changed-file checks, and stopping rules live in
-   `orchestrator2`, leaving the kickoff prompt small.
-2. *Independent evidence*. The orchestrator runs pytest and checks the changed files instead of trusting the implementer
-   report.
-3. *Fresh-context repair*. A failed check gets at most one new `@implementer2` with the exact failure and current file
-   state. The original child is never resumed.
-
-Start a new chat for each phase, select `orchestrator2`, and enter:
-
-```markdown
-Run Phase N from @specs/roadmap.md.
-```
-
-The one-repair rule is still model-enforced; the 16-step cap is the mechanical circuit breaker. Telemetry must show
-whether Gemma follows that boundary.
-
-Possibilities
-
-- Context7
-- Fix at the end
-- Make sure context is "cleared" between runs
-    - Explain that context accumulates in the main chat but not in the implementer
-    - Or, perhaps we want that context to come in
-- Investigate a simpler roadmap and the orchestrator is able to convert to details
+1. The protocol is delivered by a command, not typed: `$ARGUMENTS` is
+   substituted and the template reaches the main verbatim, so the learner
+   prompt shrinks to `/phase N` and paraphrase drift at kickoff is eliminated.
+   The command guarantees the protocol is *received*, not that it is
+   *followed*; telemetry remains the check.
+2. Validation moved from the implementer to the main chat. The implementer
+   has no Bash at all; the main runs the one validation command itself and
+   diffs `git status --short` against a pre-delegation baseline, so scope
+   checking no longer trusts the implementer's self-report and the old
+   non-mechanical "terminal validation ordering" rule is retired.
+3. One repair is now allowed: exactly one delegation to a *fresh* implementer
+   child carrying only the implicated file names, the exact pytest failure,
+   and the required fix — never file contents, which would risk truncation
+   under the model's output cap. The repair child reads the named files itself
+   and rewrites complete files, so the edit-anchor (`oldString`) failure mode
+   never applies.
+4. The implementer's permissions are default-deny: every tool is denied unless
+   explicitly allowed, including any tool an IDE client injects. Reads and
+   writes are allowed everywhere except `specs/*` — the implementer structurally cannot consult the roadmap and improvise scope — its entire knowledge of the phase is the packet.
+5. The controller is bounded: a step cap on the primary agent converts runaway
+   drift into visible failure, and each delegation requires a click-through
+   approval that doubles as a manual repair counter. (If the approval dialog
+   offers "always", declining to use it keeps the counter working.)
+6. The Gemma model entries raise `limit.output` to 4096 so packets and coverage
+   matrices are not truncated mid-message; packets must still stay terse and
+   never inline file contents.
+7. The command's first line tells the main to refuse to run in a chat with
+   prior phase work. This is model-enforced, but it fails visibly to the
+   learner instead of silently degrading isolation.

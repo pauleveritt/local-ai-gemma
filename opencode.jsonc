@@ -1,0 +1,17 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "build": {
+      // Circuit breaker for the medium controller; a clean phase run needs
+      // ~15-18 steps, so 25 allows one full run plus one repair, never two.
+      "steps": 25,
+      "permission": {
+        "task": {
+          // The learner clicks to approve each delegation: a visible handoff
+          // and a manual repair counter.
+          "implementer1a": "ask"
+        }
+      }
+    }
+  }
+}
